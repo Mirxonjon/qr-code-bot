@@ -37,10 +37,10 @@ async function initStorage() {
  * @param {number} size
  * @returns {Promise<string>} Object name
  */
-async function uploadFile(stream, fileName, size) {
+async function uploadFile(stream, fileName, size, contentType = 'video/mp4') {
   try {
     const metaData = {
-      'Content-Type': 'video/mp4',
+      'Content-Type': contentType,
     };
     await minioClient.putObject(bucketName, fileName, stream, size, metaData);
     return fileName;
@@ -55,11 +55,11 @@ async function uploadFile(stream, fileName, size) {
  * @param {string} fileName 
  * @returns {Promise<string>} URL
  */
-async function getPresignedUrl(fileName) {
+async function getPresignedUrl(fileName, contentType = 'video/mp4') {
   try {
     const respHeaders = {
       'response-content-disposition': 'inline',
-      'response-content-type': 'video/mp4'
+      'response-content-type': contentType
     };
     return await minioClient.presignedUrl('GET', bucketName, fileName, config.storage.expiry, respHeaders);
   } catch (err) {

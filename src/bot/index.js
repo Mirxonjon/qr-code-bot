@@ -14,51 +14,51 @@ async function initBot() {
     bot.sendMessage(msg.chat.id, "Assalomu alaykum! Menga video yuboring, men uni MinIO-ga yuklayman va sizga QR kod va havola beraman.");
   });
 
-  // Handle video messages
-  bot.on('video', async (msg) => {
+  async function handleMedia(msg, media, contentType) {
     const chatId = msg.chat.id;
-    const fileId = msg.video.file_id;
+    const fileId = media.file_id;
+    const size = media.file_size;
 
     try {
-      const waitMsg = await bot.sendMessage(chatId, "Video qabul qilindi. Yuklanmoqda, iltimos kuting...");
+      const waitMsg = await bot.sendMessage(chatId, "Fayl qabul qilindi. Yuklanmoqda, iltimos kuting...");
 
-      // 1. Get file link from Telegram
       const file = await bot.getFile(fileId);
       const fileUrl = `https://api.telegram.org/file/bot${config.telegram.token}/${file.file_path}`;
 
-      // 2. Download from TG and upload to MinIO as stream
       const response = await axios({
         method: 'get',
         url: fileUrl,
         responseType: 'stream'
       });
 
-      const fileName = `video_${Date.now()}_${chatId}.mp4`;
-      await storageService.uploadFile(response.data, fileName, msg.video.file_size);
+      const ext = (file.file_path.split('.').pop() || 'bin').toLowerCase();
+      const fileName = `video_${Date.now()}_${chatId}.${ext}`;
+      await storageService.uploadFile(response.data, fileName, size, contentType);
 
-      // 3. Generate presigned URL
-      const presignedUrl = await storageService.getPresignedUrl(fileName);
-
-      // 4. Generate QR code
+      const presignedUrl = await storageService.getPresignedUrl(fileName, contentType);
       const qrBuffer = await qrService.generateQRCode(presignedUrl);
 
-      // 5. Send results back
       await bot.deleteMessage(chatId, waitMsg.message_id);
-      
       await bot.sendPhoto(chatId, qrBuffer, {
-        caption: `Video muvaffaqiyatli yuklandi!\n\nHavola: ${presignedUrl}`
+        caption: `Fayl muvaffaqiyatli yuklandi!\n\nHavola: ${presignedUrl}`
       });
-
     } catch (err) {
-      console.error('Error processing video:', err);
-      bot.sendMessage(chatId, "Kechirasiz, videoni qayta ishlashda xatolik yuz berdi.");
+      console.error('Error processing media:', err);
+      bot.sendMessage(chatId, "Kechirasiz, faylni qayta ishlashda xatolik yuz berdi.");
     }
+  }
+
+  bot.on('video', (msg) => handleMedia(msg, msg.video, msg.video.mime_type || 'video/mp4'));
+  bot.on('video_note', (msg) => handleMedia(msg, msg.video_note, 'video/mp4'));
+  bot.on('animation', (msg) => handleMedia(msg, msg.animation, msg.animation.mime_type || 'video/mp4'));
+  bot.on('document', (msg) => {
+    const mime = msg.document.mime_type || 'application/octet-stream';
+    handleMedia(msg, msg.document, mime);
   });
 
-  // Handle other messages
   bot.on('message', (msg) => {
-    if (msg.text && !msg.text.startsWith('/') && !msg.video) {
-        bot.sendMessage(msg.chat.id, "Iltimos, menga video fayl yuboring.");
+    if (msg.text && !msg.text.startsWith('/')) {
+      bot.sendMessage(msg.chat.id, "Iltimos, menga video yoki fayl yuboring.");
     }
   });
 
