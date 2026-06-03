@@ -51,11 +51,21 @@ async function uploadFile(stream, fileName, size, contentType = 'video/mp4') {
 }
 
 /**
- * Get a presigned URL for an object
- * @param {string} fileName 
- * @returns {Promise<string>} URL
+ * Build a permanent public URL (bucket must allow anonymous GET).
+ */
+function getPublicUrl(fileName) {
+  const base = (config.storage.baseUrl || '').replace(/\/+$/, '');
+  return `${base}/${bucketName}/${encodeURIComponent(fileName)}`;
+}
+
+/**
+ * Get a URL for an object. Returns a public URL when STORAGE_USE_PRESIGNED_URLS
+ * is false; otherwise a time-limited presigned URL.
  */
 async function getPresignedUrl(fileName, contentType = 'video/mp4') {
+  if (!config.storage.usePresigned) {
+    return getPublicUrl(fileName);
+  }
   try {
     const respHeaders = {
       'response-content-disposition': 'inline',

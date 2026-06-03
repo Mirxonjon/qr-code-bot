@@ -56,9 +56,28 @@ async function initBot() {
     handleMedia(msg, msg.document, mime);
   });
 
-  bot.on('message', (msg) => {
-    if (msg.text && !msg.text.startsWith('/')) {
-      bot.sendMessage(msg.chat.id, "Iltimos, menga video yoki fayl yuboring.");
+  bot.on('message', async (msg) => {
+    if (!msg.text) return;
+
+    const urlMatch = msg.text.match(/https?:\/\/[^\s]*\/tg-bot\/([^\s?]+)/i);
+    if (urlMatch) {
+      const fileName = decodeURIComponent(urlMatch[1]);
+      try {
+        const contentType = fileName.toLowerCase().endsWith('.mp4') ? 'video/mp4' : 'application/octet-stream';
+        const freshUrl = await storageService.getPresignedUrl(fileName, contentType);
+        const qrBuffer = await qrService.generateQRCode(freshUrl);
+        await bot.sendPhoto(msg.chat.id, qrBuffer, {
+          caption: `Yangi havola:\n${freshUrl}`
+        });
+      } catch (err) {
+        console.error('Error refreshing link:', err);
+        bot.sendMessage(msg.chat.id, "Havolani yangilashda xatolik.");
+      }
+      return;
+    }
+
+    if (!msg.text.startsWith('/')) {
+      bot.sendMessage(msg.chat.id, "Iltimos, menga video yoki eski havolani yuboring.");
     }
   });
 
